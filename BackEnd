@@ -1,0 +1,303 @@
+//BackEnd
+const express = require('express');
+const mysql = require('mysql2/promise');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const winston = require('winston');
+const { body, query, validationResult } = require('express-validator');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const axios = require('axios');
+
+dotenv.config();
+
+const app = express();
+
+// Logger setup
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'logs/combined.log' }),
+    new winston.transports.Console()
+  ]
+});
+
+app.use(cors());
+app.use(express.json());
+app.use((req, res, next) => {
+  logger.info(`${req.method} ${req.url}`);
+  next();
+});
+
+// MySQL connection pool
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || 'your_password',
+  database: process.env.DB_NAME || 'ai_job_recommendation',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
+
+// Initialize database and tables
+async function initializeDatabase() {
+  try {
+    const connection = await pool.getConnection();
+    await connection.query(`CREATE DATABASE IF NOT EXISTS ${process.env.DB_NAME}`);
+    await connection.query(`USE ${process.env.DB_NAME}`);
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        role ENUM('job_seeker', 'recruiter', 'admin') NOT NULL DEFAULT 'job_seeker',
+        skills JSON NOT NULL,
+        experience INT DEFAULT 0,
+        preferences JSON,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS companies (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        recruiter_id INT NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        industry VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (recruiter_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS jobs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        recruiter_id INT NOT NULL,
+        company_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT NOT NULL,
+        required_skills JSON NOT NULL,
+        category VARCHAR(100),
+        location VARCHAR(255),
+        salary DECIMAL(10,2),
+        job_type ENUM('remote', 'on_site', 'full_time', 'part_time') NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        posted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (recruiter_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+      )
+    `);
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS applications (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        job_id INT NOT NULL,
+        status ENUM('Applied', 'Shortlisted', 'Interview Scheduled', 'Rejected') DEFAULT 'Applied',
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+      )
+    `);
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS recommendations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        job_id INT NOT NULL,
+        score DECIMAL(5,2),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+      )
+    `);
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS feedback (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        job_id INT NOT NULL,
+        action ENUM('applied', 'saved', 'ignored') NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
+      )
+    `);
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        sender_id INT NOT NULL,
+        receiver_id INT NOT NULL,
+        content TEXT NOT NULL,
+        sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        type ENUM('job_match', 'application_update', 'interview_request', 'new_application') NOT NULL,
+        message TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS analytics (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        type ENUM('job_search_trend', 'application_success', 'hiring_trend', 'ai_accuracy') NOT NULL,
+        data JSON NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    connection.release();
+    logger.info('Database initialized');
+  } catch (err) {
+    logger.error('Database initialization failed:', err);
+    process.exit(1);
+  }
+}
+
+// Middleware
+const handleErrors = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    logger.warn(`Validation failed for ${req.method} ${req.url}: ${JSON.stringify(errors.array())}`);
+    return res.status(400).json({ errors: errors.array() });
+  }
+  next();
+};
+
+const authenticate = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    logger.warn('No token provided');
+    return res.status(401).json({ error: 'No token provided' });
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    logger.warn('Invalid token');
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+};
+
+const restrictTo = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      logger.warn(`Unauthorized access by user ${req.user.id} (role: ${req.user.role})`);
+      return res.status(403).json({ error: 'Access restricted' });
+    }
+    next();
+  };
+};
+
+// Authentication Routes
+const validateRegister = [
+  body('name').trim().notEmpty().withMessage('Name is required').isLength({ max: 255 }).withMessage('Name too long'),
+  body('email').isEmail().withMessage('Invalid email').isLength({ max: 255 }).withMessage('Email too long'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('role').isIn(['job_seeker', 'recruiter', 'admin']).withMessage('Role must be job_seeker, recruiter, or admin'),
+  body('skills').optional().isArray().withMessage('Skills must be an array'),
+  body('experience').optional().isInt({ min: 0 }).withMessage('Experience must be a non-negative integer'),
+  body('preferences').optional().isObject().withMessage('Preferences must be an object')
+];
+
+app.post('/api/auth/register', validateRegister, handleErrors, async (req, res, next) => {
+  const { name, email, password, role, skills, experience, preferences } = req.body;
+  try {
+    const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const [result] = await pool.query(
+      'INSERT INTO users (name, email, password, role, skills, experience, preferences) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [name, email, hashedPassword, role || 'job_seeker', JSON.stringify(skills || []), experience || 0, JSON.stringify(preferences || {})]
+    );
+    const token = jwt.sign({ id: result.insertId, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    res.status(201).json({ token, user: { id: result.insertId, name, email, role } });
+  } catch (err) {
+    logger.error('POST /auth/register failed:', err);
+    next(err);
+  }
+});
+
+const validateLogin = [
+  body('email').isEmail().withMessage('Invalid email'),
+  body('password').notEmpty().withMessage('Password is required')
+];
+
+app.post('/api/auth/login', validateLogin, handleErrors, async (req, res, next) => {
+  const { email, password } = req.body;
+  try {
+    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    if (users.length === 0) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const user = users[0];
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  } catch (err) {
+    logger.error('POST /auth/login failed:', err);
+    next(err);
+  }
+});
+
+// User Routes
+const validateUser = [
+  body('name').trim().notEmpty().withMessage('Name is required').isLength({ max: 255 }).withMessage('Name too long'),
+  body('email').isEmail().withMessage('Invalid email').isLength({ max: 255 }).withMessage('Email too long'),
+  body('skills').optional().isArray().withMessage('Skills must be an array'),
+  body('experience').optional().isInt({ min: 0 }).withMessage('Experience must be a non-negative integer'),
+  body('preferences').optional().isObject().withMessage('Preferences must be an object'),
+  body('role').optional().isIn(['job_seeker', 'recruiter', 'admin']).withMessage('Role must be job_seeker, recruiter, or admin')
+];
+
+app.get('/api/users/profile', authenticate, async (req, res, next) => {
+  try {
+    const [rows] = await pool.query('SELECT id, name, email, role, skills, experience, preferences FROM users WHERE id = ?', [req.user.id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const user = rows[0];
+    user.skills = JSON.parse(user.skills);
+    user.preferences = JSON.parse(user.preferences);
+    res.json(user);
+  } catch (err) {
+    logger.error('GET /users/profile failed:', err);
+    next(err);
+  }
+});
+
+app.put('/api/users/profile', authenticate, validateUser, handleErrors, async (req, res, next) => {
+  const { name, email, skills, experience, preferences } = req.body;
+  try {
+    const [result] = await pool.query(
+      'UPDATE users SET name = ?, email = ?, skills = ?, experience = ?, preferences = ? WHERE id = ?',
+      [name, email, JSON.stringify(skills || []), experience || 0, JSON.stringify(preferences || {}), req.user.id]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ id: req.user.id, name, email, skills, experience, preferences });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+    logger.error('PUT /users/profile failed:', err);
+    next(err);
+  }
+});

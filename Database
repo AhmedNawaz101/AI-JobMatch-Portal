@@ -1,0 +1,246 @@
+-- Database Schema for AI Job Recommendation System
+-- 1. USERS Table
+CREATE TABLE Users (
+    user_id SERIAL PRIMARY KEY,
+    name VARCHAR(100),
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(100) NOT NULL,
+    user_type VARCHAR(20) CHECK (user_type IN ('job_seeker', 'recruiter', 'admin'))
+);
+
+drop table users;
+
+-- Inserting sample users
+INSERT INTO Users (name, email, password, user_type)
+VALUES
+('John Doe', 'john.doe@example.com', 'password123', 'job_seeker'),
+('Jane Smith', 'jane.smith@example.com', 'password123', 'recruiter'),
+('Mike Johnson', 'mike.johnson@example.com', 'password123', 'admin'),
+('Anna Brown', 'anna.brown@example.com', 'password123', 'job_seeker'),
+('Chris White', 'chris.white@example.com', 'password123', 'recruiter'),
+('David Black', 'david.black@example.com', 'password123', 'job_seeker'),
+('Laura Green', 'laura.green@example.com', 'password123', 'recruiter'),
+('James Miller', 'james.miller@example.com', 'password123', 'admin'),
+('Sophia Taylor', 'sophia.taylor@example.com', 'password123', 'job_seeker'),
+('William Harris', 'william.harris@example.com', 'password123', 'recruiter');
+
+
+
+-- 2. USER_PROFILE Table
+CREATE TABLE User_Profile (
+    profile_id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES Users(user_id),
+    resume_link TEXT,
+    skills TEXT,
+    experience_level VARCHAR(50),
+    education TEXT,
+    location_preference VARCHAR(100),
+    job_preference VARCHAR(100)
+);
+
+drop table user_profile;
+
+-- Inserting user profiles (Linked to Users)
+INSERT INTO User_Profile (user_id, resume_link, skills, experience_level, education, location_preference, job_preference)
+VALUES
+(1, 'https://example.com/resume1.pdf', 'Leadership, Project Management', 'Mid Level', 'BS in Business Administration', 'New York, NY', 'Project Manager'),
+(2, 'https://example.com/resume2.pdf', 'Recruiting, Client Relations', 'Senior', 'MBA in Human Resources', 'San Francisco, CA', 'Recruiter'),
+(3, 'https://example.com/resume3.pdf', 'System Admin, Network Management', 'Senior', 'BS in Computer Science', 'Chicago, IL', 'System Admin'),
+(4, 'https://example.com/resume4.pdf', 'Java, Python, SQL', 'Junior', 'BS in Software Engineering', 'Los Angeles, CA', 'Software Developer'),
+(5, 'https://example.com/resume5.pdf', 'Python, Data Analysis', 'Mid Level', 'BS in Data Science', 'San Francisco, CA', 'Data Scientist'),
+(6, 'https://example.com/resume6.pdf', 'Leadership, Team Management', 'Senior', 'MBA in Management', 'Boston, MA', 'Project Manager'),
+(7, 'https://example.com/resume7.pdf', 'Recruiting, Negotiation', 'Mid Level', 'MBA in HR', 'New York, NY', 'Recruiter'),
+(8, 'https://example.com/resume8.pdf', 'Networking, Security', 'Junior', 'BS in IT Security', 'Chicago, IL', 'Network Engineer'),
+(9, 'https://example.com/resume9.pdf', 'JavaScript, React, HTML/CSS', 'Junior', 'BS in Web Development', 'San Diego, CA', 'Front-End Developer'),
+(10, 'https://example.com/resume10.pdf', 'Design, UX/UI', 'Senior', 'BS in Graphic Design', 'Austin, TX', 'UX/UI Designer');
+
+
+
+-- 3. JOB_SEEKERS Table
+CREATE TABLE Job_Seekers (
+    profile_id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES Users(user_id),
+    resume_link TEXT,
+    skills TEXT,
+    experience_level VARCHAR(50),
+    education TEXT,
+    location_preference VARCHAR(100),
+    job_preference VARCHAR(100)
+);
+
+drop table Job_Seekers;
+
+-- Inserting job seekers (Linked to Users)
+INSERT INTO Job_Seekers (user_id, resume_link, skills, experience_level, education, location_preference, job_preference)
+VALUES
+(1, 'https://example.com/resume1.pdf', 'Leadership, Project Management', 'Mid Level', 'BS in Business Administration', 'New York, NY', 'Project Manager'),
+(4, 'https://example.com/resume4.pdf', 'Java, Python, SQL', 'Junior', 'BS in Software Engineering', 'Los Angeles, CA', 'Software Developer'),
+(5, 'https://example.com/resume5.pdf', 'Python, Data Analysis', 'Mid Level', 'BS in Data Science', 'San Francisco, CA', 'Data Scientist'),
+(6, 'https://example.com/resume6.pdf', 'Leadership, Team Management', 'Senior', 'MBA in Management', 'Boston, MA', 'Project Manager'),
+(7, 'https://example.com/resume7.pdf', 'Recruiting, Negotiation', 'Mid Level', 'MBA in HR', 'New York, NY', 'Recruiter'),
+(8, 'https://example.com/resume8.pdf', 'Networking, Security', 'Junior', 'BS in IT Security', 'Chicago, IL', 'Network Engineer'),
+(9, 'https://example.com/resume9.pdf', 'JavaScript, React, HTML/CSS', 'Junior', 'BS in Web Development', 'San Diego, CA', 'Front-End Developer'),
+(10, 'https://example.com/resume10.pdf', 'Design, UX/UI', 'Senior', 'BS in Graphic Design', 'Austin, TX', 'UX/UI Designer');
+
+
+
+-- 4. RECRUITERS Table
+CREATE TABLE Recruiters (
+    recruiter_id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES Users(user_id),
+    company_name VARCHAR(100),
+    company_website TEXT,
+    job_post_limit INT,
+    industry VARCHAR(50),
+    company_location VARCHAR(100),
+    verified_status BOOLEAN
+);
+
+drop table Recruiters;
+
+-- Inserting recruiters (Linked to Users)
+INSERT INTO Recruiters (user_id, company_name, company_website, job_post_limit, industry, company_location, verified_status)
+VALUES
+(1, 'Tech Corp', 'www.techcorp.com', 5, 'Technology', 'San Francisco, CA', TRUE),
+(2, 'Data Solutions', 'www.datasolutions.com', 5, 'Data Science', 'Los Angeles, CA', TRUE),
+(3, 'BuildIT', 'www.buildit.com', 5, 'Construction', 'Chicago, IL', TRUE),
+(4, 'HireUp', 'www.hireup.com', 5, 'Recruitment', 'New York, NY', TRUE),
+(5, 'InnovativeTech', 'www.innovativetech.com', 5, 'Tech', 'San Diego, CA', TRUE),
+(6, 'Creative Minds', 'www.creativeminds.com', 5, 'Design', 'Austin, TX', TRUE),
+(7, 'NextGen Solutions', 'www.nextgensolutions.com', 5, 'Software', 'Boston, MA', TRUE),
+(8, 'TechMasters', 'www.techmasters.com', 5, 'Technology', 'Chicago, IL', TRUE),
+(9, 'Design Studio', 'www.designstudio.com', 5, 'Design', 'San Francisco, CA', TRUE),
+(10, 'Global Reach', 'www.globalreach.com', 5, 'Consulting', 'Seattle, WA', TRUE);
+
+
+-- 5. ADMINS Table
+CREATE TABLE Admins (
+    admin_id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES Users(user_id),
+    role VARCHAR(50),
+    permissions TEXT
+);
+
+drop table admins;
+
+-- Inserting admin data (Linked to Users)
+INSERT INTO Admins (user_id, role, permissions)
+VALUES
+(3, 'System Admin', 'Full access to all data'),
+(6, 'HR Admin', 'Manage job postings, recruitments');
+
+
+-- 6. JOB_LISTINGS Table
+CREATE TABLE Job_Listings (
+    job_id SERIAL PRIMARY KEY,
+    recruiter_id INT REFERENCES Recruiters(recruiter_id),
+    job_title VARCHAR(100),
+    company_name VARCHAR(100),
+    job_description TEXT,
+    required_skills TEXT,
+    salary_range VARCHAR(50),
+    job_type VARCHAR(50),
+    location VARCHAR(100),
+    status VARCHAR(20)
+);
+
+drop table Job_Listings;
+
+-- Inserting job listings (Linked to Recruiters) with 10 unique job IDs
+INSERT INTO Job_Listings (recruiter_id, job_title, company_name, job_description, required_skills, salary_range, job_type, location, status)
+VALUES
+(1, 'Software Engineer', 'Tech Corp', 'Responsible for software development.', 'Java, Python, SQL', '$80,000 - $100,000', 'Full-time', 'San Francisco, CA', 'Open'),
+(2, 'Data Analyst', 'Data Solutions', 'Analyze data and generate reports.', 'Python, SQL, Data Visualization', '$70,000 - $90,000', 'Full-time', 'Los Angeles, CA', 'Open'),
+(3, 'Civil Engineer', 'BuildIT', 'Design and manage construction projects.', 'Civil Engineering, Project Management', '$75,000 - $100,000', 'Full-time', 'Chicago, IL', 'Open'),
+(4, 'Recruiter', 'HireUp', 'Find and recruit the best talent.', 'Recruitment, Negotiation', '$60,000 - $80,000', 'Full-time', 'New York, NY', 'Open'),
+(5, 'Data Scientist', 'InnovativeTech', 'Develop models for predictive analysis.', 'Python, Machine Learning', '$95,000 - $120,000', 'Full-time', 'San Diego, CA', 'Open'),
+(6, 'Graphic Designer', 'Creative Minds', 'Design brand materials and products.', 'Design, Photoshop, Illustrator', '$65,000 - $85,000', 'Full-time', 'Austin, TX', 'Open'),
+(7, 'Software Developer', 'NextGen Solutions', 'Develop and maintain software solutions.', 'Java, C++, SQL', '$80,000 - $100,000', 'Full-time', 'Boston, MA', 'Open'),
+(8, 'Database Administrator', 'TechMasters', 'Maintain and optimize databases for clients.', 'SQL, Database Management', '$70,000 - $90,000', 'Full-time', 'Chicago, IL', 'Open'),
+(9, 'UX/UI Designer', 'Design Studio', 'Design user interfaces and improve user experience.', 'UX, UI, Adobe XD', '$75,000 - $95,000', 'Full-time', 'San Francisco, CA', 'Open'),
+(10, 'Project Manager', 'Tech Corp', 'Oversee and manage software projects.', 'Leadership, Agile, Project Management', '$90,000 - $120,000', 'Full-time', 'San Francisco, CA', 'Open');
+
+
+-- 7. JOB_APPLICATIONS Table
+CREATE TABLE Job_Applications (
+    application_id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES Users(user_id),
+    job_id INT REFERENCES Job_Listings(job_id),
+    status VARCHAR(50)
+);
+
+drop table Job_Applications;
+
+-- Inserting job applications (Linked to Users and Job_Listings)
+INSERT INTO Job_Applications (user_id, job_id, status)
+VALUES
+(1, 1, 'Applied'),(2, 1, 'Applied'),(3, 2, 'Rejected'),(4, 3, 'Applied'),(5, 4, 'Under Review'),
+(6, 5, 'Accepted'),(7, 6, 'Applied'),(8, 7, 'Under Review'),(9, 8, 'Applied'),(10, 7, 'Rejected');
+
+
+-- 8. AI_RECOMMENDATIONS Table
+CREATE TABLE AI_Recommendations (
+    recommendation_id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES Users(user_id),
+    job_id INT REFERENCES Job_Listings(job_id),
+    match_score FLOAT
+);
+
+drop table AI_Recommendations;
+
+-- Inserting AI recommendations (Linked to Users and Job_Listings)
+INSERT INTO AI_Recommendations (user_id, job_id, match_score)
+VALUES
+(1, 1, 85.5),(1, 2, 78.3),(2, 3, 88.0),(3, 4, 75.4),(4, 5, 80.1),(5, 6, 90.0),(6, 7, 79.5),(7, 8, 88.2),
+(8, 7, 72.6),(9, 6, 95.0);
+
+-- 9. SAVED_JOBS Table
+CREATE TABLE Saved_Jobs (
+    saved_id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES Users(user_id),
+    job_id INT REFERENCES Job_Listings(job_id)
+);
+
+drop table saved_jobs;
+
+-- Inserting saved jobs (Linked to Users and Job_Listings)
+INSERT INTO Saved_Jobs (user_id, job_id)
+VALUES
+(1, 1),(2, 2),(3, 3),(4, 4),(5, 5),(6, 6),(7, 7),(8, 8),(9, 9),(10, 10);
+
+-- 10. EMPLOYER_REVIEWS Table
+CREATE TABLE Employer_Reviews (
+    review_id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES Users(user_id),
+    recruiter_id INT REFERENCES Recruiters(recruiter_id),
+    rating INT CHECK (rating BETWEEN 1 AND 5),
+    review TEXT
+);
+
+drop table employer_reviews;
+
+-- Inserting employer reviews (Linked to Users and Recruiters)
+INSERT INTO Employer_Reviews (user_id, recruiter_id, rating, review)
+VALUES
+(1, 1, 5, 'Great company to work with, excellent communication during the interview process.'),
+(2, 2, 4, 'Good experience, but could improve interview scheduling.'),
+(3, 3, 3, 'Average experience, not much communication after application.'),
+(4, 4, 5, 'Really enjoyed the recruitment process, very professional.'),
+(5, 5, 4, 'Good, but the feedback could be faster.'),
+(6, 6, 5, 'Excellent process, really enjoyed working with the team.'),
+(7, 7, 2, 'Long process, not much communication.'),
+(8, 8, 3, 'Decent process, but it was too slow for my liking.'),
+(9, 9, 4, 'Good experience overall.'),
+(10, 10, 5, 'Perfect experience, everything went smoothly.');
+
+
+TRUNCATE TABLE Job_Applications CASCADE;
+TRUNCATE TABLE Employer_Reviews CASCADE;
+TRUNCATE TABLE AI_Recommendations CASCADE;
+TRUNCATE TABLE Job_Seekers CASCADE;
+TRUNCATE TABLE Saved_Jobs CASCADE;
+TRUNCATE TABLE Job_Listings CASCADE;
+TRUNCATE TABLE User_Profile CASCADE;
+TRUNCATE TABLE Recruiters CASCADE;
+TRUNCATE TABLE Admins CASCADE;
+TRUNCATE TABLE Users CASCADE;

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Applicant Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .job-box {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f9f9f9;
+        }
+
+        .job-details {
+            flex: 2;
+            padding-right: 15px;
+        }
+
+        .job-image {
+            flex: 1;
+            max-width: 150px;
+            height: auto;
+            border-radius: 8px;
+            object-fit: cover;
+        }
+
+        .btn {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: white;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .btn.remove-btn {
+            background-color: #dc3545;
+        }
+
+        .btn.remove-btn:hover {
+            background-color: #a71d2a;
+        }
+    </style>
+</head>
+<body class="applicant-page">
+    <header class="header">
+        <div class="nav-container">
+            <div class="logo">AI JobPortal</div>
+            <div class="header-buttons">
+                <button id="personalInfoBtn" class="btn">Personal Info</button>
+                <button id="appliedJobsBtn" class="btn">Applied Jobs</button>
+                <button id="savedJobsBtn" class="btn">Saved Jobs</button>
+                <button id="displayAllJobsBtn" class="btn">Display All Jobs</button>
+                <button id="messagesBtn" class="btn">Messages</button>
+                <button id="backToLogin" class="btn back-btn">Logout</button>
+            </div>
+        </div>
+    </header>
+    <main>
+        <!-- Personal Info Form -->
+        <div id="personalInfoContainer" class="form-container" style="display: none;">
+            <h2>Personal Information</h2>
+            <form id="personalInfoForm">
+                <label for="name">Full Name:</label>
+                <input type="text" id="name" placeholder="Enter your full name" required>
+
+                <label for="age">Age:</label>
+                <input type="number" id="age" placeholder="Enter your age" required>
+
+                <label for="address">Address:</label>
+                <textarea id="address" placeholder="Enter your address" required></textarea>
+
+                <label for="skills">Skills:</label>
+                <input type="text" id="skills" placeholder="Enter your skills (comma-separated)" required>
+
+                <label for="experience">Experience Level:</label>
+                <select id="experience" required>
+                    <option value="" disabled selected>Select your experience level</option>
+                    <option value="Fresher">Fresher</option>
+                    <option value="Intermediate">Intermediate</option>
+                    <option value="Expert">Expert</option>
+                </select>
+
+                <label for="education">Education:</label>
+                <input type="text" id="education" placeholder="Enter your education details" required>
+
+                <label for="location">Preferred Location:</label>
+                <input type="text" id="location" placeholder="Enter your preferred job location" required>
+
+                <label for="jobPreference">Job Preference:</label>
+                <input type="text" id="jobPreference" placeholder="Enter your job preference" required>
+
+                <label for="resume">Upload Resume:</label>
+                <input type="file" id="resume" accept=".pdf,.doc,.docx" required>
+
+                <button type="button" id="savePersonalInfoBtn" class="btn">Save Form</button>
+            </form>
+        </div>
+
+        <!-- Job listings container -->
+        <div id="jobListings" class="job-listings-container">
+            <h2>Available Jobs</h2>
+            <div id="jobsContainer"></div>
+        </div>
+
+        <!-- Messages Section -->
+        <div id="messagesContainer" class="messages-container" style="display: none;">
+            <h2>Messages</h2>
+            <div id="chatList"></div>
+            <div id="chatWindow" style="display: none;">
+                <h3 id="chatEmployerName"></h3>
+                <div id="chatMessages" class="chat-messages"></div>
+                <input type="text" id="chatInput" placeholder="Type a message..." />
+                <button id="sendMessageBtn" class="btn">Send</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Redirect to login page when "Logout" is clicked
+        document.getElementById('backToLogin').addEventListener('click', () => {
+            localStorage.removeItem('currentUser'); // Clear user session
+            window.location.href = 'login.html';
+        });
+
+        // Ensure only applicants can access this page
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        if (!currentUser || currentUser.role !== 'applicant') {
+            window.location.href = 'login.html';
+        }
+
+        // Arrays to store applied and saved jobs
+        const appliedJobs = [];
+        const savedJobs = [];
+
+        // Function to hide all sections
+        function hideAllSections() {
+            document.getElementById('personalInfoContainer').style.display = "none";
+            document.getElementById('jobListings').style.display = "none";
+            document.getElementById('messagesContainer').style.display = "none";
+        }
+
+        // Function to display jobs
+        function displayJobs(jobs, isSavedJobs = false) {
+            const jobsContainer = document.getElementById('jobsContainer');
+            jobsContainer.innerHTML = ""; // Clear previous jobs
+
+            jobs.forEach((job, index) => {
+                const jobBox = document.createElement('div');
+                jobBox.classList.add('job-box');
+                jobBox.innerHTML = `
+                    <div class="job-details">
+                        <h3>${job.job_title}</h3>
+                        <p><strong>Company:</strong> ${job.company_name}</p>
+                        <p><strong>Description:</strong> ${job.job_description}</p>
+                        <p><strong>Skills Required:</strong> ${job.required_skills}</p>
+                        <p><strong>Salary:</strong> ${job.salary_range}</p>
+                        <p><strong>Job Type:</strong> ${job.job_type}</p>
+                        <p><strong>Location:</strong> ${job.location}</p>
+                        <p><strong>Status:</strong> ${job.status}</p>
+                        <div class="job-actions">
+                            ${
+                                isSavedJobs
+                                    ? `<button class="btn remove-btn" onclick="unsaveJob(${job.id})">Remove</button>`
+                                    : `
+                                        <button class="btn apply-btn" onclick="applyForJob(${job.id})">Apply</button>
+                                        <button class="btn save-btn" onclick="saveJob(${job.id})">Save</button>
+                                        <button class="btn message-btn" onclick="openChat(${job.id}, ${job.employer_id}, '${job.company_name}')">Message</button>
+                                      `
+                            }
+                        </div>
+                    </div>
+                `;
+                jobsContainer.appendChild(jobBox);
+            });
+        }
+
+        // Function to save a job
+        async function saveJob(jobId) {
+            try {
+                const response = await fetch('http://localhost:5000/api/jobs/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentUser.token}`
+                    },
+                    body: JSON.stringify({
+                        jobId,
+                        userId: currentUser.id
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to save job');
+                }
+
+                alert('Job saved successfully!');
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // Function to unsave a job
+        async function unsaveJob(jobId) {
+            try {
+                const response = await fetch('http://localhost:5000/api/jobs/unsave', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentUser.token}`
+                    },
+                    body: JSON.stringify({
+                        jobId,
+                        userId: currentUser.id
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to remove saved job');
+                }
+
+                alert('Job removed from saved jobs!');
+                // Refresh saved jobs list
+                fetchSavedJobs();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // Function to apply for a job
+        async function applyForJob(jobId) {
+            try {
+                const response = await fetch('http://localhost:5000/api/jobs/apply', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentUser.token}`
+                    },
+                    body: JSON.stringify({
+                        jobId,
+                        userId: currentUser.id
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to apply for job');
+                }
+
+                alert('Application submitted successfully!');
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // Chat functionality
+        let currentChatJobId = null;
+        let currentChatEmployerId = null;
+
+        function openChat(jobId, employerId, companyName) {
+            currentChatJobId = jobId;
+            currentChatEmployerId = employerId;
+            
+            // Show messages container and chat window
+            hideAllSections();
+            document.getElementById('messagesContainer').style.display = "block";
+            document.getElementById('chatWindow').style.display = "block";
+            document.getElementById('chatEmployerName').textContent = `Chat with ${companyName}`;
+            
+            // Load chat messages
+            loadChatMessages();
+        }
+
+        async function loadChatMessages() {
+            try {
+                const response = await fetch(`http://localhost:5000/api/messages/${currentChatJobId}/${currentChatEmployerId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentUser.token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load messages');
+                }
+
+                const { data: messages } = await response.json();
+                const chatMessages = document.getElementById('chatMessages');
+                chatMessages.innerHTML = messages.map(msg => `
+                    <div class="message ${msg.senderId === currentUser.id ? 'sent' : 'received'}">
+                        <p>${msg.content}</p>
+                        <small>${new Date(msg.createdAt).toLocaleString()}</small>
+                    </div>
+                `).join('');
+                
+                // Scroll to bottom
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // Send message functionality
+        document.getElementById('sendMessageBtn').addEventListener('click', async () => {
+            const messageInput = document.getElementById('chatInput');
+            const content = messageInput.value.trim();
+            
+            if (!content) return;
+
+            try {
+                const response = await fetch('http://localhost:5000/api/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentUser.token}`
+                    },
+                    body: JSON.stringify({
+                        receiverId: currentChatEmployerId,
+                        jobId: currentChatJobId,
+                        content
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to send message');
+                }
+
+                // Clear input and reload messages
+                messageInput.value = '';
+                loadChatMessages();
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+
+        // Handle Enter key in chat input
+        document.getElementById('chatInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('sendMessageBtn').click();
+            }
+        });
+
+        // Add CSS for chat messages
+        const style = document.createElement('style');
+        style.textContent = `
+            .chat-messages {
+                height: 300px;
+                overflow-y: auto;
+                padding: 10px;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                margin-bottom: 10px;
+            }
+            .message {
+                margin-bottom: 10px;
+                padding: 8px;
+                border-radius: 5px;
+                max-width: 70%;
+            }
+            .message.sent {
+                background-color: #007bff;
+                color: white;
+                margin-left: auto;
+            }
+            .message.received {
+                background-color: #e9ecef;
+                margin-right: auto;
+            }
+            .message small {
+                display: block;
+                font-size: 0.8em;
+                margin-top: 5px;
+                opacity: 0.7;
+            }
+            #chatInput {
+                width: calc(100% - 100px);
+                padding: 8px;
+                margin-right: 10px;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+            }
+            .job-actions {
+                display: flex;
+                gap: 10px;
+                margin-top: 10px;
+            }
+            .message-btn {
+                background-color: #28a745;
+            }
+            .message-btn:hover {
+                background-color: #218838;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Fetch jobs from the backend
+        async function fetchJobs() {
+            try {
+                const response = await fetch('http://localhost:5000/api/jobs');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch job listings');
+                }
+                const data = await response.json();
+                return data.data; // Array of job listings
+            } catch (error) {
+                alert(error.message);
+                return [];
+            }
+        }
+
+        // Fetch saved jobs from the backend
+        async function fetchSavedJobs() {
+            try {
+                const response = await fetch(`http://localhost:5000/api/jobs/saved?userId=${currentUser.id}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch saved jobs');
+                }
+                const data = await response.json();
+                return data.data; // Array of saved jobs
+            } catch (error) {
+                alert(error.message);
+                return [];
+            }
+        }
+
+        // Fetch and display jobs on page load
+        async function displayAllJobs() {
+            const jobs = await fetchJobs();
+            displayJobs(jobs);
+        }
+
+        // Fetch and display saved jobs
+        async function displaySavedJobs() {
+            const jobs = await fetchSavedJobs();
+            displayJobs(jobs, true);
+        }
+
+        // Save personal information
+        document.getElementById('savePersonalInfoBtn').addEventListener('click', async () => {
+            const personalInfo = {
+                name: document.getElementById('name').value,
+                age: document.getElementById('age').value,
+                address: document.getElementById('address').value,
+                skills: document.getElementById('skills').value,
+                experience: document.getElementById('experience').value,
+                education: document.getElementById('education').value,
+                location: document.getElementById('location').value,
+                jobPreference: document.getElementById('jobPreference').value,
+            };
+
+            try {
+                const response = await fetch(`http://localhost:5000/api/job_seekers/${currentUser.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(personalInfo),
+                });
+                if (!response.ok) throw new Error('Failed to save personal information');
+                alert('Personal information updated successfully!');
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+
+        // Button functionality
+        document.getElementById('personalInfoBtn').addEventListener('click', () => {
+            hideAllSections();
+            document.getElementById('personalInfoContainer').style.display = "block";
+        });
+
+        document.getElementById('appliedJobsBtn').addEventListener('click', () => {
+            hideAllSections();
+            displayJobs(appliedJobs, false);
+            document.getElementById('jobListings').style.display = "block";
+        });
+
+        document.getElementById('savedJobsBtn').addEventListener('click', () => {
+            hideAllSections();
+            displaySavedJobs();
+            document.getElementById('jobListings').style.display = "block";
+        });
+
+        document.getElementById('displayAllJobsBtn').addEventListener('click', () => {
+            hideAllSections();
+            displayAllJobs();
+            document.getElementById('jobListings').style.display = "block";
+        });
+
+        document.getElementById('messagesBtn').addEventListener('click', () => {
+            hideAllSections();
+            document.getElementById('messagesContainer').style.display = "block";
+        });
+
+        // Display all jobs by default
+        displayAllJobs();
+    </script>
+</body>
+</html>

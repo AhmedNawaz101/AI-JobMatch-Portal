@@ -1,0 +1,6 @@
+PG_HOST=localhost
+PG_DATABASE=job_recommendation
+PG_USER=job_user
+PG_PASSWORD='newpassword'
+
+console.log('Server is running and listening for requests...');

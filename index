@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - AI JobPortal</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        .home-container {
+            position: relative;
+            text-align: center;
+            color: white;
+            margin-top: 20%;
+        }
+
+        .content-box {
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 20px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+
+        .btn {
+            display: block;
+            margin: 10px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            color: white;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1 class="header-title">Welcome to AI JobPortal</h1>
+    </header>
+    <main>
+        <div class="home-container">
+            <div class="content-box">
+                <h2>What would you like to do?</h2>
+                <button id="searchJobsBtn" class="btn">Search for Jobs</button>
+                <button id="uploadInfoBtn" class="btn">Upload Info</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Redirect to the applicant page to display all jobs
+        document.getElementById('searchJobsBtn').addEventListener('click', () => {
+            window.location.href = 'applicant.html?view=jobs'; // Pass query parameter to show jobs
+        });
+
+        // Redirect to the applicant page to show the personal info form
+        document.getElementById('uploadInfoBtn').addEventListener('click', () => {
+            window.location.href = 'applicant.html?view=info'; // Pass query parameter to show personal info form
+        });
+    </script>
+</body>
+</html>

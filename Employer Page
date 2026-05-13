@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employer Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .job-box, .application-box {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            margin-top: 10px;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: white;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .btn.remove-btn {
+            background-color: #dc3545;
+        }
+
+        .btn.remove-btn:hover {
+            background-color: #a71d2a;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="nav-container">
+            <div class="logo">AI JobPortal</div>
+            <div class="header-buttons">
+                <button id="applicationsReceivedBtn" class="btn">Applications Received</button>
+                <button id="jobsPlacedBtn" class="btn">Jobs Placed</button>
+                <button id="addJobBtn" class="btn">Add Job</button>
+                <button id="messagesBtn" class="btn">Messages</button>
+                <button id="backToLogin" class="btn back-btn">Logout</button>
+            </div>
+        </div>
+    </header>
+    <main>
+        <!-- Applications Received Section -->
+        <div id="applicationsReceivedContainer" class="section-container" style="display: none;">
+            <h2>Applications Received</h2>
+            <div id="applicationsContainer"></div>
+        </div>
+
+        <!-- Jobs Placed Section -->
+        <div id="jobsPlacedContainer" class="section-container">
+            <h2>Jobs Placed</h2>
+            <div id="jobsPlacedList"></div>
+        </div>
+
+        <!-- Add Job Form -->
+        <div id="addJobContainer" class="form-container" style="display: none;">
+            <h2>Add Job</h2>
+            <form id="addJobForm">
+                <label for="jobTitle">Job Title:</label>
+                <input type="text" id="jobTitle" placeholder="Enter job title" required>
+
+                <label for="companyName">Company Name:</label>
+                <input type="text" id="companyName" placeholder="Enter company name" required>
+
+                <label for="jobDescription">Description:</label>
+                <textarea id="jobDescription" placeholder="Enter job description" required></textarea>
+
+                <label for="jobSalary">Salary:</label>
+                <input type="text" id="jobSalary" placeholder="Enter salary range" required>
+
+                <label for="jobSkills">Skills Required:</label>
+                <input type="text" id="jobSkills" placeholder="Enter skills (comma-separated)" required>
+
+                <label for="jobLocation">Location:</label>
+                <input type="text" id="jobLocation" placeholder="Enter job location" required>
+
+                <label for="jobType">Job Type:</label>
+                <select id="jobType" required>
+                    <option value="" disabled selected>Select job type</option>
+                    <option value="Full-time">Full-time</option>
+                    <option value="Part-time">Part-time</option>
+                    <option value="Remote">Remote</option>
+                </select>
+
+                <button type="button" id="saveJobBtn" class="btn">Save Job</button>
+            </form>
+        </div>
+    </main>
+
+    <script>
+        // Redirect to login page when "Logout" is clicked
+        document.getElementById('backToLogin').addEventListener('click', () => {
+            localStorage.removeItem('currentUser'); // Clear user session
+            window.location.href = 'login.html';
+        });
+
+        // Ensure only employers can access this page
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        console.log('Current user data:', currentUser); // Debug log
+
+        // Allow both 'recruiter' and 'employer' roles
+        const validRoles = ['recruiter', 'employer'];
+        if (!currentUser || !validRoles.includes(currentUser.role)) {
+            console.log('Access denied: Invalid role', currentUser?.role); // Debug log
+            window.location.href = 'login.html';
+        }
+
+        // Utility function to hide all sections
+        function hideAllSections() {
+            document.getElementById('applicationsReceivedContainer').style.display = "none";
+            document.getElementById('jobsPlacedContainer').style.display = "none";
+            document.getElementById('addJobContainer').style.display = "none";
+        }
+
+        // Fetch and display jobs placed
+        async function displayJobsPlaced() {
+            try {
+                console.log('Current user:', currentUser); // Debug log for user data
+                const response = await fetch('http://localhost:5000/api/jobs', {
+                    headers: { 
+                        'Authorization': `Bearer ${currentUser.token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Server response:', errorText);
+                    throw new Error(`Failed to fetch jobs: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log('All jobs from server:', data.data); // Log all jobs
+
+                // Filter jobs for the current recruiter
+                const recruiterJobs = data.data.filter(job => {
+                    const isMatch = Number(job.recruiter_id) === Number(currentUser.id);
+                    console.log(`Job ${job.job_id}: recruiter_id=${job.recruiter_id}, currentUser.id=${currentUser.id}, isMatch=${isMatch}`);
+                    return isMatch;
+                });
+                
+                console.log('Filtered jobs for recruiter:', recruiterJobs);
+                console.log(`Found ${recruiterJobs.length} jobs for recruiter ID ${currentUser.id}`);
+
+                const jobsPlacedList = document.getElementById('jobsPlacedList');
+                if (recruiterJobs.length === 0) {
+                    jobsPlacedList.innerHTML = '<p>No jobs posted yet. Click "Add Job" to post your first job listing.</p>';
+                } else {
+                    jobsPlacedList.innerHTML = recruiterJobs.map(job => `
+                        <div class="job-box">
+                            <h3>${job.job_title}</h3>
+                            <p><strong>Company:</strong> ${job.company_name}</p>
+                            <p><strong>Description:</strong> ${job.job_description}</p>
+                            <p><strong>Salary:</strong> ${job.salary_range}</p>
+                            <p><strong>Skills:</strong> ${job.required_skills}</p>
+                            <p><strong>Location:</strong> ${job.location}</p>
+                            <p><strong>Type:</strong> ${job.job_type}</p>
+                            <p><strong>Status:</strong> ${job.status || 'Open'}</p>
+                            <button class="btn view-applications-btn" data-id="${job.job_id}">View Applications</button>
+                            <button class="btn remove-btn" data-id="${job.job_id}">Remove Job</button>
+                        </div>
+                    `).join('');
+                }
+
+                // Add event listeners for View Applications buttons
+                document.querySelectorAll('.view-applications-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const jobId = e.target.getAttribute('data-id');
+                        await fetchApplications(jobId);
+                    });
+                });
+
+                // Add event listeners for Remove Job buttons
+                document.querySelectorAll('.remove-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const jobId = e.target.getAttribute('data-id');
+                        await removeJob(jobId);
+                        displayJobsPlaced(); // Refresh the jobs placed section
+                    });
+                });
+            } catch (error) {
+                console.error('Error in displayJobsPlaced:', error);
+                alert(`Error: ${error.message}. Please check the console for more details.`);
+            }
+        }
+
+        // Fetch applications for a specific job
+        async function fetchApplications(jobId) {
+            try {
+                const response = await fetch(`http://localhost:5000/api/applications/job/${jobId}/applicants`, {
+                    headers: { 
+                        'Authorization': `Bearer ${currentUser.token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch applications');
+                }
+
+                const data = await response.json();
+                displayApplications(data.data);
+            } catch (error) {
+                console.error('Error fetching applications:', error);
+                alert(error.message);
+            }
+        }
+
+        // Display applications
+        function displayApplications(applications) {
+            hideAllSections();
+            const applicationsContainer = document.getElementById('applicationsContainer');
+            applicationsContainer.innerHTML = applications.length ? applications.map(app => `
+                <div class="application-box">
+                    <h3>${app.user?.name || 'Unnamed Applicant'}</h3>
+                    <p><strong>Email:</strong> ${app.user?.email || 'No email provided'}</p>
+                    <p><strong>Skills:</strong> ${app.user?.skills || 'No skills listed'}</p>
+                    <p><strong>Experience:</strong> ${app.user?.experience || 'Not specified'}</p>
+                    <p><strong>Status:</strong> ${app.status || 'Pending'}</p>
+                    <button class="btn" onclick="updateApplicationStatus(${app.id}, 'Accepted')">Accept</button>
+                    <button class="btn remove-btn" onclick="updateApplicationStatus(${app.id}, 'Rejected')">Reject</button>
+                </div>
+            `).join('') : '<p>No applications received yet.</p>';
+            
+            document.getElementById('applicationsReceivedContainer').style.display = "block";
+        }
+
+        // Update application status
+        async function updateApplicationStatus(applicationId, status) {
+            try {
+                const response = await fetch(`http://localhost:5000/api/applications/${applicationId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentUser.token}`
+                    },
+                    body: JSON.stringify({ status })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to update application status');
+                }
+
+                alert(`Application ${status.toLowerCase()} successfully`);
+                // Refresh the applications list
+                const jobId = document.querySelector('.view-applications-btn').getAttribute('data-id');
+                await fetchApplications(jobId);
+            } catch (error) {
+                console.error('Error updating application status:', error);
+                alert(error.message);
+            }
+        }
+
+        // Remove a job
+        async function removeJob(jobId) {
+            try {
+                const response = await fetch(`http://localhost:5000/api/jobs/${jobId}`, {
+                    method: 'DELETE',
+                    headers: { 
+                        'Authorization': `Bearer ${currentUser.token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to remove job');
+                }
+
+                alert('Job removed successfully!');
+                await displayJobsPlaced(); // Refresh the jobs list
+            } catch (error) {
+                console.error('Error removing job:', error);
+                alert(error.message);
+            }
+        }
+
+        // Save a new job
+        document.getElementById('saveJobBtn').addEventListener('click', async () => {
+            const job_title = document.getElementById('jobTitle').value.trim();
+            const company_name = document.getElementById('companyName').value.trim();
+            const job_description = document.getElementById('jobDescription').value.trim();
+            const salary_range = document.getElementById('jobSalary').value.trim();
+            const required_skills = document.getElementById('jobSkills').value.trim();
+            const location = document.getElementById('jobLocation').value.trim();
+            const job_type = document.getElementById('jobType').value;
+
+            if (!job_title || !company_name || !job_description || !salary_range || !required_skills || !location || !job_type) {
+                alert("Please fill in all fields.");
+                return;
+            }
+
+            try {
+                const jobData = {
+                    job_title,
+                    company_name,
+                    job_description,
+                    salary_range,
+                    required_skills,
+                    location,
+                    job_type,
+                    recruiter_id: currentUser.id,
+                    status: 'Open'
+                };
+
+                console.log('Sending job data:', jobData);
+
+                const response = await fetch('http://localhost:5000/api/jobs', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentUser.token}`
+                    },
+                    body: JSON.stringify(jobData)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Server response:', errorText);
+                    throw new Error('Failed to save job');
+                }
+
+                const result = await response.json();
+                console.log('Job saved successfully:', result);
+
+                alert("Job added successfully!");
+                // Clear form
+                document.getElementById('addJobForm').reset();
+                // Hide add job form and show jobs list
+                hideAllSections();
+                document.getElementById('jobsPlacedContainer').style.display = "block";
+                await displayJobsPlaced();
+            } catch (error) {
+                console.error('Error saving job:', error);
+                alert(`Error saving job: ${error.message}`);
+            }
+        });
+
+        // Button functionality
+        document.getElementById('applicationsReceivedBtn').addEventListener('click', () => {
+            hideAllSections();
+            document.getElementById('applicationsReceivedContainer').style.display = "block";
+        });
+
+        document.getElementById('jobsPlacedBtn').addEventListener('click', () => {
+            hideAllSections();
+            document.getElementById('jobsPlacedContainer').style.display = "block";
+        });
+
+        document.getElementById('addJobBtn').addEventListener('click', () => {
+            hideAllSections();
+            document.getElementById('addJobContainer').style.display = "block";
+        });
+
+        document.getElementById('messagesBtn').addEventListener('click', () => {
+            hideAllSections();
+            alert("Messages feature is under development.");
+        });
+
+        // Display jobs placed on page load
+        displayJobsPlaced();
+    </script>
+</body>
+</html>
